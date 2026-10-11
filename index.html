@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>IEM Nozzle Database & CAD Visualizer</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --card-border: #30363d;
+      --text-main: #f0f6fc;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #1f6feb;
+      --accent-glow: rgba(88, 166, 255, 0.15);
+      --danger: #f85149;
+      --warning: #d29922;
+      --success: #3fb950;
+      --purple: #bc8cff;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font);
+      line-height: 1.5;
+      padding: 16px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header {
+      max-width: 1320px;
+      margin: 0 auto 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 14px;
+    }
+
+    .title-group h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .title-group p {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      margin-top: 2px;
+    }
+
+    .stats-strip {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .stat-pill {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .stat-pill strong {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    main {
+      max-width: 1320px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    #visualizer-card {
+      background: linear-gradient(180deg, #161b22 0%, #11141a 100%);
+      border: 1px solid var(--accent);
+      box-shadow: 0 8px 32px var(--accent-glow);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .viz-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid rgba(88, 166, 255, 0.2);
+      padding-bottom: 12px;
+    }
+
+    .viz-header h2 {
+      font-size: 1.15rem;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .viz-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .toggle-group {
+      display: inline-flex;
+      background: var(--bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 2px;
+    }
+    .toggle-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 5px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .toggle-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .svg-stage-container {
+      background: #090d13;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      overflow-x: auto;
+      padding: 12px;
+      display: flex;
+      justify-content: center;
+      min-height: 270px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    svg.cad-canvas {
+      font-family: var(--font-mono);
+      user-select: none;
+      min-width: 100%;
+    }
+
+    .viz-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      font-size: 0.78rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg);
+      border: 1px solid var(--card-border);
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+    }
+    .comp-card {
+      background: var(--bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px;
+      position: relative;
+    }
+    .comp-card-remove {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.3rem;
+      cursor: pointer;
+    }
+    .comp-card-remove:hover { color: var(--danger); }
+    .comp-card h3 {
+      font-size: 1rem;
+      margin-bottom: 2px;
+    }
+    .comp-card .make-label {
+      font-size: 0.75rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-row {
+      margin-top: 8px;
+      font-size: 0.8rem;
+    }
+    .metric-label {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+      margin-bottom: 3px;
+    }
+    .metric-bar-bg {
+      height: 6px;
+      background: #21262d;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .metric-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+    }
+
+    .fit-badge {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 3px 8px;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .fit-slim { background: rgba(63, 185, 80, 0.15); color: var(--success); border: 1px solid var(--success); }
+    .fit-normal { background: rgba(88, 166, 255, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+    .fit-wide { background: rgba(210, 153, 34, 0.15); color: var(--warning); border: 1px solid var(--warning); }
+    .fit-xl { background: rgba(248, 81, 73, 0.15); color: var(--danger); border: 1px solid var(--danger); }
+
+    .tip-advice {
+      margin-top: 8px;
+      font-size: 0.75rem;
+      color: #c9d1d9;
+      background: #161b22;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border-left: 3px solid var(--purple);
+    }
+
+    .controls-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .search-box {
+      flex: 1 1 200px;
+    }
+    .search-box input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: var(--text-main);
+      font-size: 0.88rem;
+    }
+    .search-box input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+    select {
+      background: var(--bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 7px 10px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+    }
+
+    .table-container {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.85rem;
+      min-width: 620px;
+    }
+    th {
+      background: #1c2128;
+      padding: 10px 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--card-border);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    th:hover { color: var(--accent); }
+    th.sorted-asc::after { content: " ↑"; color: var(--accent); }
+    th.sorted-desc::after { content: " ↓"; color: var(--accent); }
+    td {
+      padding: 9px 12px;
+      border-bottom: 1px solid #21262d;
+      vertical-align: middle;
+    }
+    tr:hover td { background-color: #1a202c; }
+
+    .action-btn {
+      background: #21262d;
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 5px 9px;
+      border-radius: 5px;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+    .action-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    footer {
+      max-width: 1320px;
+      margin: 16px auto;
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--card-border);
+      padding-top: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="title-group">
+      <h1>📐 IEM Nozzle Database & CAD Visualizer</h1>
+      <p>True-to-scale 2D nozzle cross-sections: compare lip flare, bore width, and stem depth.</p>
+    </div>
+    <div class="stats-strip">
+      <div class="stat-pill">Monitors: <strong id="stat-count">0</strong></div>
+      <div class="stat-pill">Avg Lip: <strong id="stat-avg-lip">-</strong></div>
+      <div class="stat-pill">Widest: <strong id="stat-max-lip">-</strong></div>
+      <div class="stat-pill">Slimmest: <strong id="stat-min-lip">-</strong></div>
+    </div>
+  </header>
+
+  <main>
+    <section id="visualizer-card">
+      <div class="viz-header">
+        <h2><span>⚡</span> 2D Nozzle Cross-Section CAD View</h2>
+        <div class="viz-controls">
+          <div class="toggle-group">
+            <button id="btn-mode-overlay" class="toggle-btn active" onclick="setVizMode('overlay')">Overlay (Aligned)</button>
+            <button id="btn-mode-side" class="toggle-btn" onclick="setVizMode('side')">Side-by-Side</button>
+          </div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chk-grid" checked onchange="renderVisualizer()" /> Grid (1mm)
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chk-dims" checked onchange="renderVisualizer()" /> Dimensions
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chk-bore" checked onchange="renderVisualizer()" /> Sound Core
+          </label>
+        </div>
+      </div>
+
+      <div class="svg-stage-container">
+        <svg id="cadSvg" class="cad-canvas" width="840" height="270" viewBox="0 0 840 270">
+          <defs>
+            <pattern id="cadGridSmall" width="22" height="22" patternUnits="userSpaceOnUse">
+              <path d="M 22 0 L 0 0 0 22" fill="none" stroke="#161e2b" stroke-width="0.8" />
+            </pattern>
+            <pattern id="cadGridMajor" width="110" height="110" patternUnits="userSpaceOnUse">
+              <rect width="110" height="110" fill="url(#cadGridSmall)" />
+              <path d="M 110 0 L 0 0 0 110" fill="none" stroke="#253245" stroke-width="1.2" />
+            </pattern>
+            <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#8b949e" />
+            </marker>
+          </defs>
+          <rect width="100%" height="100%" fill="#090d13" />
+          <g id="gridLayer"></g>
+          <g id="geometryLayer"></g>
+          <g id="dimensionLayer"></g>
+        </svg>
+      </div>
+
+      <div class="viz-legend" id="viz-legend"></div>
+      <div class="comparison-grid" id="comparison-grid"></div>
+    </section>
+
+    <section class="controls-panel">
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search make or model (e.g., Nova, Wan'Er, Zero, Blessing)..." oninput="renderTable()" />
+      </div>
+
+      <div class="filter-item">
+        <label for="brandFilter">Brand:</label>
+        <select id="brandFilter" onchange="renderTable()">
+          <option value="all">All Brands</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <label for="fitFilter">Fit Girth:</label>
+        <select id="fitFilter" onchange="renderTable()">
+          <option value="all">All Fit Sizes</option>
+          <option value="slim">Slim (&lt; 5.5 mm)</option>
+          <option value="standard">Standard (5.5 - 6.0 mm)</option>
+          <option value="wide">Wide (6.0 - 6.5 mm)</option>
+          <option value="xl">Extra Large (&gt; 6.5 mm)</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="table-container">
+      <table id="iemTable">
+        <thead>
+          <tr>
+            <th onclick="setSort('make')">Make</th>
+            <th onclick="setSort('model')">Model</th>
+            <th onclick="setSort('lip')">Lip Diam.</th>
+            <th onclick="setSort('bore')">Bore Diam.</th>
+            <th onclick="setSort('flare')">Lip Flare</th>
+            <th onclick="setSort('length')">Stem Depth</th>
+            <th>Fit Class</th>
+            <th>CAD Pin</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>
+    <p>Complete Standalone Database: 22 SVG Pixels = 1.0 Millimeter. Pre-loaded with all models.</p>
+  </footer>
+
+  <script>
+    // Complete database pre-compiled in compact tuple format [id, make, model, bore, lip, length]
+    const RAW_ENTRIES = [
+      [1,"Truthear","Nova",5.99,6.31,5.08],[2,"7Hz Salnotes","Zero2",5.4,6.4,4],[3,"Truthear","Hola",5.34,6.35,4.15],
+      [4,"Tanchjim","One",5,6.5,6],[5,"Tangzu","Wan'Er S.G",5,6.1,5.4],[6,"Truthear","Gate",5.38,6.2,3.9],
+      [7,"Simgot","EW100",5.3,6.18,null],[8,"Kinera Celest","Wyvern Abyss",null,5.9,null],[9,"Truthear","Zero:Red",5.75,6.8,6.3],
+      [10,"Truthear","Zero",5.75,6.8,6.3],[11,"Moondrop","Blessing 2",5.3,6.5,null],[12,"Moondrop","May",5.7,6.5,4.8],
+      [13,"Kiwi Ears","Cadenza",5.3,6.5,4],[14,"Truthear","Hexa",6.35,6.35,5.2],[15,"Truthear","Zero:Blue2",5.5,6.2,5.25],
+      [16,"Moondrop","Blessing 3",5.6,5.75,4.95],[17,"KZ","Saga",null,6.35,null],[18,"ND","Planet",5.2,5.6,4],
+      [19,"Final Audio","A5000",4.63,5.51,3.99],[20,"7Hz","Elua",5.5,6.3,4],[21,"7Hz","G1",5.6,6.15,4.6],
+      [22,"7Hz","Legato",5.5,6.1,4.4],[23,"7Hz","Sonus",5.55,6.35,6.1],[24,"7Hz","Timeless",5.4,6.3,4.2],
+      [25,"7Hz","Timeless 2",5.4,6.4,3.9],[26,"7Hz","Timeless AE",5.4,6.3,4.2],[27,"7Hz","Eternal",5.35,6.3,3.9],
+      [28,"7Hz Salnotes","Dioko",5.5,6.3,4.1],[29,"7Hz Salnotes","Zero",5.4,6.4,4],[30,"Activo","Volcano",4.55,5.45,6.4],
+      [31,"Aful","Cantor",4,5.7,8],[32,"Aful","Explorer",5.5,5.5,4.5],[33,"Aful","Magic One",5.6,5.6,6],
+      [34,"Aful","Performer 5",5.8,5.8,5.9],[35,"Aful","Performer 5+2",5.9,5.9,5.9],[36,"Agasound","AGA ONE",4.6,5.7,3.5],
+      [37,"AKG","Y20",4.3,5,5.2],[38,"Aoshida","E20",5.8,6.1,4.2],[39,"Apevoix","Grit",5.5,6.2,5],
+      [40,"Artti","R6",4.65,5.52,4],[41,"Artti","R1",6,6.35,4.5],[42,"Artti","R3",5.4,6.1,5.5],
+      [43,"Artti","T10",5.6,6.16,4.6],[44,"Artti","T10 Pro",5.4,6,3.7],[45,"Astrotec","GX100",4.6,5.4,5.5],
+      [46,"BASN","BMaster 5",5.15,6,3.5],[47,"Binary","Chopin",6.2,6.8,5],[48,"BLON","BL03",4.6,5.4,5.4],
+      [49,"BLON","BL03 II",4.4,5.3,5.7],[50,"BLON","JoJo",4.52,5.4,3.6],[51,"BLON","Z300",4.62,5.56,4.5],
+      [52,"BQEYZ","Wind",5.1,5.75,4],[53,"CCA","CRA",5,5.3,4.1],[54,"CCZ","BC04 PRO",5,5.8,5.5],
+      [55,"CCZ","DC-02",5,5.75,4.5],[56,"CCZ","Harmony",4.9,5.65,4.3],[57,"Craftears","Omnium",5.5,6.2,5],
+      [58,"CrinEar","Project Meta",4.7,5.5,3.5],[59,"CVJ","Aria",5.3,5.8,4.3],[60,"CVJ","Konoka",5.8,5.8,5.5],
+      [61,"CVJ","Night Elf",5.9,6,3.8],[62,"CVJ","Shadow Blade",5.3,5.8,5.7],[63,"CVJ","Yukimi",4.6,5.9,4.1],
+      [64,"CVJ","Neko",5.45,5.95,3.7],[65,"Denon","C425",4.6,5.6,3.7],[66,"Dunu","DaVinci",5.6,6.7,5.7],
+      [67,"Dunu","DK3001BD",5.6,6.5,5.2],[68,"Dunu","Kima 2",5.4,6.15,5.2],[69,"Dunu","Talos",5.8,6.65,5.7],
+      [70,"Dunu","Titan S2",5.1,5.6,5],[71,"EarAcoustic","SPA Limited Edition",5.5,6.35,5.7],[72,"EarAcoustic","STA Pro Max",5.3,5.93,3.8],
+      [73,"Elysian","Pilgrim",5.7,6.05,null],[74,"EPZ","530",6,6,4.8],[75,"EPZ","G20",4.5,5.7,4.4],
+      [76,"EPZ","Grindphones",5.7,5.7,5.4],[77,"EPZ","P50",5.7,5.7,5.4],[78,"EPZ","Q1 Pro",4.5,5.7,4.4],
+      [79,"Etymotic","ER2XR",3,3.5,8],[80,"FatFreq","Deuce",5.8,6.9,5.5],[81,"FatFreq","Quantum",5.65,6.1,6.7],
+      [82,"FiiO","FP3",5.5,6.1,5.3],[83,"Flipears","Aegis",5.41,6,4.2],[84,"Flipears","Legion",5.35,6,4],
+      [85,"Geek Wold","GK10s",5.3,5.9,5.5],[86,"Hawaiian Air","Buds",4.75,6.4,5.4],[87,"Hiby","Xeno",4.8,6,4.6],
+      [88,"Hidizs","MP143",5.7,6.2,5.3],[89,"Hidizs","MP145",6,7,5.7],[90,"Hidizs","ST2 Pro",4.8,6,5.5],
+      [91,"HiFi Boy","OS V3",6,6,5.9],[92,"HiSenior","Caño Cristales",5.2,6,4.5],[93,"HiSenior","Mega5Est",5.38,6.25,4.1],
+      [94,"HiSenior","Mega5Est Bass+",5.4,6.25,4],[95,"HZSound","Luna",5.3,5.8,4.4],[96,"Ikko","OH10",5,6,3.3],
+      [97,"Inawaken","Dawn Ms",5.25,6.55,3.6],[98,"Jomo","Nautilus",5.3,6,4.9],[99,"Juzear","Clear",5.5,6.15,5.3],
+      [100,"Juzear","Defiant",5.55,6.2,5.4],[101,"KBEAR","KB02",5.3,6.5,3.8],[102,"KBEAR","KS1",5,5.75,5.6],
+      [103,"KBEAR","Pecker",5.1,5.95,6],[104,"KBEAR","Rosefinch",4.75,5.9,6],[105,"KBEAR","Storm",4.8,6,5.3],
+      [106,"Kefine","Delci",5.5,6.25,4.5],[107,"Kefine","Klean",5.2,6.5,5.8],[108,"Kefine","Quatio",5.5,6.45,4.2],
+      [109,"Kinera Celest","Gumiho",5.45,6.6,3.9],[110,"Kinera Celest","IgniteX Beast",5.33,6.4,5.5],[111,"Kinera Celest","Pandamon 2.0",5.3,6.45,4.2],
+      [112,"Kinera Celest","PhoenixCall",6.1,6.5,5.4],[113,"Kinera Celest","Plutus Beast",6,6.45,4.3],[114,"Kinera Celest","Relentless",6,6.5,3.7],
+      [115,"Kinera Celest","Rue",5.42,6.05,4.6],[116,"Kinera Celest","Wyvern Black",5.33,6.1,5.6],[117,"Kinera Celest","Yaksha",5.15,6.2,4.2],
+      [118,"Kiwi Ears","Aether",5.3,6.5,3.7],[119,"Kiwi Ears","Arioso",5.2,6.4,3.6],[120,"Kiwi Ears","Astral",5.1,6,3.5],
+      [121,"Kiwi Ears","Dolce",4.6,5.6,3.5],[122,"Kiwi Ears","Etude",5.65,6.35,4.92],[123,"Kiwi Ears","KE4",5,6,3.5],
+      [124,"Kiwi Ears","Melody",5.5,6.2,4.7],[125,"Kiwi Ears","Orchestra Lite",6.1,6.5,5],[126,"Kiwi Ears","Punch",5,6,3.4],
+      [127,"Kiwi Ears","Quintet",5.5,6.3,3.4],[128,"Kiwi Ears","Septet",5.05,5.77,3.25],[129,"Kiwi Ears","Singolo",5.25,6.5,4.4],
+      [130,"KZ","Castor Bass",5.2,6,5.3],[131,"KZ","Castor Pro Bass",5.7,6.3,5],[132,"KZ","DQ6",4.1,5.1,5.75],
+      [133,"KZ","EDC Pro",5,5.6,4.1],[134,"KZK","EDX Lite",5.1,6,4.4],[135,"KZ","Krilla",5.3,6,5.3],
+      [136,"KZ","Libra X",4.75,5.3,5],[137,"KZ","PR2",4.8,5.7,4.2],[138,"KZ","PRX",4.75,5.75,4.2],
+      [139,"KZ","Saga Bal",5.3,6.22,5.1],[140,"KZ","ZS12 Pro X",5.15,6,4.25],[141,"KZ","ZSN Prox",5.4,5.8,5.9],
+      [142,"KZ","ZST",5.42,6,4.5],[143,"Letshuoer","D13",5,6,4.9],[144,"Letshuoer","DX1",5.88,6.45,4.85],
+      [145,"Letshuoer","DZ4",6,6.35,4.9],[146,"Letshuoer","Galileo",5.93,6.3,4.95],[147,"Letshuoer","S08",5.35,6,4.75],
+      [148,"Letshuoer","S12",5.3,5.9,3.8],[149,"Letshuoer","S12 2024",5.3,6.25,4.2],[150,"Letshuoer","S12 Pro",5.3,5.9,3.8],
+      [151,"Letshuoer","S15",5.8,6.15,4.4],[152,"Letshuoer","Z12",5.3,5.9,3.75],[153,"Logitech","UE 350vi",4.9,5.4,5.1],
+      [154,"Lun Sheng","White Blue Snow",4.45,5.35,4.25],[155,"Meaoes","Eagle",5.2,5.8,5.7],[156,"Meze","Alba",5,6,3.7],
+      [157,"Monoprice","8320",4.6,5.9,3.5],[158,"Moondrop","Aria Elven Maiden",5.4,5.4,5],[159,"Moondrop","Blessing 2 Dusk",6.55,6.55,5.8],
+      [160,"Moondrop","Chu",5.2,6,4.7],[161,"Moondrop","Chu 2",5.2,6,5],[162,"Moondrop","Chu 2 DSP",5,5.8,5],
+      [163,"Moondrop","Dusk",5.75,5.75,4.4],[164,"Moondrop","Harmon",5.33,6.65,5.1],[165,"Moondrop","Kadenz",5,6.6,7.9],
+      [166,"Moondrop","Kato",4.75,5.8,5],[167,"Moondrop","Lan",5,5.8,4.85],[168,"Moondrop","Quarks 2",5.45,6.08,5.32],
+      [169,"Moondrop","Rays",5.75,6.75,4.8],[170,"Moondrop","SSP",5.4,5.4,5],[171,"Moondrop","Starfield 2",5.2,6.15,4.85],
+      [172,"Moondrop","Stellaris",5.5,6.3,4],[173,"Moondrop","Variations",6.48,6.48,6.2],[174,"Moondrop","Aria II",5.38,6.13,4.91],
+      [175,"Moondrop","Aria Snow Edition",5.5,5.5,5.08],[176,"Moondrop","Beautiful World",5,5.8,5.7],[177,"Moondrop","Starfield",5.5,5.5,5],
+      [178,"Myer Audio","SLIIVO SLT6",5.5,6.2,4.25],[179,"ND","001",4.8,5.6,4.5],[180,"ND","Venus",4.8,5.6,4],
+      [181,"ND","X12",5.3,5.8,4.7],[182,"NiceHCK","DB2",4.85,5.9,4.1],[183,"NiceHCK","F1 Pro",5.25,5.75,3.5],
+      [184,"NiceHCK","NX8",5.27,6.01,3.7],[185,"Oriveti","Bleqk Lowmaster",5.6,6.3,3.65],[186,"Padsmith","IEM",5.4,6.15,3.3],
+      [187,"Penon","Fan 2",4.5,5.5,4.1],[188,"Penon","Fan 3",5,5.8,4.5],[189,"Pula","PA02",5.5,6.2,5],
+      [190,"QKZ","Hades",6,6,4.7],[191,"QKZ","QKZ x HBB",5,6.1,5.3],[192,"QKZ","ZXK",5.15,6,5],
+      [193,"Qudelix","71T",5.7,6,5.1],[194,"Raptgo","Hook-X",5.1,6.1,3.8],[195,"Redspace","Involution",5.4,6,5.7],
+      [196,"RumAudio","Blues",5.8,6.5,4.1],[197,"SeeAudio","Yume",4.7,5.75,4.6],[198,"SeeAudio","Yume IV",4.7,5.8,4],
+      [199,"SGOR","Adonis",5.4,5.85,4.5],[200,"SGOR","Luna",5.35,5.9,5.5],[201,"SGOR","Venus",5.5,6,4.5],
+      [202,"Shozy","P20",5.5,6,4.75],[203,"Simgot","EA1000",4.85,5.75,4.6],[204,"Simgot","EA500 DSP",5.2,6.1,5],
+      [205,"Simgot","EA500LM",5.2,6.1,5],[206,"Simgot","EM6L",6,6,4.7],[207,"Simgot","ET142",5.15,6.1,null],
+      [208,"Simgot","EW100P",5.4,6.2,4],[209,"Simgot","EW200",4.7,5.7,3.7],[210,"Simgot","EW200 DSP",4.5,5.6,3.7],
+      [211,"Simgot","EW300",5.2,6.1,4],[212,"Simgot","EW300 DSP",5.2,6.1,4],[213,"Simgot","Supermix 4",5.75,5.75,4],
+      [214,"Sivga","Nightingale",5.25,6.23,5.65],[215,"Sivga","Que",5.2,6.18,5.8],[216,"Sivga","Que UTG",5.25,6.25,5.3],
+      [217,"Softears","Volume S",5.5,5.5,4.7],[218,"Sonic Memory","SM1 Lite",5.5,6.5,5.5],[219,"Sonic Memory","SW500H",5,5.85,4.7],
+      [220,"Sony","MDR-EX15LP",4.8,5.3,4.5],[221,"Symphonized","NRG",4.9,6.25,3.1],[222,"SymphonyEars","Hexad",5.3,5.8,5.3],
+      [223,"Tanchjim","Bunny DSP",5,6.6,5.9],[224,"Tanchjim","Ola",5,6.45,6],[225,"Tangzu","Fudu Verse 1",5.4,5.9,6],
+      [226,"Tangzu","Wan'Er S.G 2",5.5,6.3,3.6],[227,"Tangzu","Wan'er S.G 2 DSP",5.5,6.3,3.6],[228,"Tangzu","Wan'Er Studio",5.5,6.4,3.4],
+      [229,"Tangzu","Xuan Nv",5.5,6,3.75],[230,"Tangzu","Yu Xuan Ji",5.45,6.4,3.45],[231,"Tangzu","Zetian Wu",5.4,6.5,3.5],
+      [232,"Tangzu","Zetian Wu-Heyday",5.4,6.4,3.5],[233,"Tangzu","Zetian: The Legend",5.4,6.4,3.3],[234,"Tangzu","XuanWu Gate",5.46,6,4.3],
+      [235,"Tekkusai","Lucid",5.95,6.3,4.5],[236,"TFZ","Athena",5.7,6.2,4.4],[237,"Thieaudio","Hype 2",5.35,6.25,4.25],
+      [238,"Tiandirenhe","TD08 Pro Odin",4.9,5.6,5.1],[239,"TinHiFi","C1",5.45,5.9,4.55],[240,"TinHiFi","C2 2025",4.95,5.8,4.2],
+      [241,"TinHiFi","C2 Mechwarrior",4.95,5.8,4.15],[242,"TinHiFi","Dudu",5.4,5.76,4.4],[243,"TinHiFi","P1 Max II",5.4,5.75,4.35],
+      [244,"TinHiFi","P1 Plus",5.9,6.75,5.7],[245,"TRI","Draco",5.1,6.1,4.7],[246,"TRI","i3 Mk3",5.9,6.1,3.8],
+      [247,"Tripowin","Kailua",4.8,5.8,3.4],[248,"Tripowin","Olina SE",4.8,5.9,3.3],[249,"Tripowin","Piccolo",5.5,6.1,4.8],
+      [250,"Tripowin","Vivace",5.1,5.9,4.2],[251,"TRN","Conch",5,5.8,5.6],[252,"TRN","Jaws",5.3,5.9,5.1],
+      [253,"TRN","Medusa",5.4,5.9,4.7],[254,"TRN","Rosefinch",5.4,5.8,4.8],[255,"TRN","Shell",5,5.85,4.8],
+      [256,"TRN","White Tiger",5.3,6,6.7],[257,"Twistura","D-Minor",5.2,6,4.5],[258,"Xenns","Top",5.4,6.3,4.7],
+      [259,"Xenns","Up",5.3,6.25,4.25],[260,"Xenns","Tea Pro",5.4,6.3,4],[261,"XSL","X-300",4.75,5.9,4.4],
+      [262,"XSL","X-One LM",4.8,5.4,6],[263,"Yongse","Son Wukong",5.75,6.1,4],[264,"Zempire","ZE51B",6.5,6.5,4.7],
+      [265,"Zhulinniao","Jinghong Z3",5.3,6.25,5.1],[266,"Zhulinniao","Qingluan Z4",5,6.5,4.3],[267,"Ziigaat","Arcadia",5.55,6.2,4.2],
+      [268,"Ziigaat","Arcanis",5.55,6.2,null],[269,"Ziigaat","Arete",5.45,6,4.8],[270,"Ziigaat","CincoTres",5.2,6,4.7],
+      [271,"Ziigaat","Cinno",5.4,6.3,4.7],[272,"Ziigaat","DosCinco",5.2,6,4.7],[273,"Ziigaat","Estrella",5.6,6.15,5],
+      [274,"Ziigaat","Lush",5.65,6.15,4],[275,"Ziigaat","Nuo",4.9,5.8,4.4],[276,"Ziigaat","Odyssey",5.56,6.2,4.4],
+      [277,"Dunu","Vulkan 2",5.66,6.5,5.4],[279,"Tangzu","Wan'er 2",5.51,6.25,3.8],[280,"Truthear","Pure",null,6.2,5],
+      [281,"Binary","DynaQuattro",6.07,6.07,3.8],[282,"CrinEar","Daybreak",5.4,5.9,null],[283,"Tanchjim","Fission",5,6.5,4.3],
+      [284,"Moondrop","Aria",5.3,5.6,null],[285,"Letshuoer","Cadenza 4",6.3,6.5,null],[286,"Sony","MH755",3.8,4.8,null],
+      [287,"7th Acoustics","Supernova",6.1,6.1,5.8],[288,"HiSenior","Okavango",5.19,5.97,4.8],[289,"Kinera Celest","Wyvern Black 2",4.96,6.02,4.5],
+      [290,"Punch Audio","Martillo",5.1,5.98,3.5],[291,"Tanchjim","4U",4.97,6.47,4.43],[292,"Penon","Fan 3S",4.94,5.8,4.3],
+      [293,"EarAcoustics","STA-K",5.33,5.93,3.8],[294,"EarAcoustics","STA-Pro-Max",5.3,5.93,3.8],[295,"Myer-Audio","SLIIVO SL224",5.51,6.18,3.5],
+      [296,"Softears","Studio 4",5.8,5.8,4.2],[297,"FiiO","FX17",5.5,6,null],[298,"Pula","Unicrom",5.12,6.31,4.4],
+      [299,"EPZ","K9",5.6,5.65,4.4],[300,"Tangzu","DUFU Second Stanza",5.5,6,null],[301,"ZiiGaat","Crescent",5.6,6.2,3.9],
+      [302,"Campfire","Alien Brain",5.4,6,4.5],[303,"Xenns","Top Pro",5.18,6.05,4.2],[304,"Moondrop","Blessing 3 Aqua",5.65,6.8,4.1]
+    ];
+
+    // Normalize records into active dataset
+    const data = RAW_ENTRIES.map(([id, make, model, bore, lip, length]) => ({
+      id, make, model,
+      bore: bore != null ? parseFloat(bore.toFixed(2)) : null,
+      lip: lip != null ? parseFloat(lip.toFixed(2)) : null,
+      length: length != null ? parseFloat(length.toFixed(2)) : null,
+      flare: (lip != null && bore != null) ? parseFloat((lip - bore).toFixed(2)) : null
+    }));
+
+    let comparedIds = new Set([9, 16]); // Default showroom: Zero:Red vs Blessing 3
+    let currentSort = { key: 'lip', dir: 'desc' };
+    let vizMode = 'overlay';
+
+    const PALETTE = ['#58a6ff', '#f85149', '#3fb950', '#d29922'];
+    const SCALE_PX = 22.0; // 22px = 1.0mm
+    const BASE_Y = 210;
+
+    function getFitClass(lip) {
+      if (!lip) return { label: 'Unknown', css: '' };
+      if (lip < 5.5) return { label: 'Slim / Deep Fit', css: 'fit-slim' };
+      if (lip <= 6.0) return { label: 'Universal Fit', css: 'fit-normal' };
+      if (lip <= 6.5) return { label: 'Moderately Wide', css: 'fit-wide' };
+      return { label: 'Extra Wide ("Chonky")', css: 'fit-xl' };
+    }
+
+    function getTipAdvice(lip) {
+      if (!lip) return 'Measurement unavailable.';
+      if (lip < 4.0) return 'Requires micro tips (e.g., Etymotic 3mm or adapters).';
+      if (lip < 5.4) return 'Best with SpinFit CP100+, Final Type E, or Sony Hybrid tips.';
+      if (lip <= 6.2) return 'Universal fit: SpinFit W1/CP145, Dunu S&S, Divinus Velvet.';
+      return 'Wide-bore fit: Requires elastic/soft tips like SpinFit CP155 or Spring Tips.';
+    }
+
+    function init() {
+      // Brands dropdown
+      const brands = [...new Set(data.map(d => d.make))].sort();
+      const brandFilter = document.getElementById('brandFilter');
+      brands.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b;
+        opt.textContent = b;
+        brandFilter.appendChild(opt);
+      });
+
+      // Global Stats
+      const validLips = data.filter(d => d.lip != null).map(d => d.lip);
+      const avgLip = (validLips.reduce((a, b) => a + b, 0) / validLips.length).toFixed(2);
+      const maxItem = data.reduce((max, d) => (d.lip && (!max || d.lip > max.lip)) ? d : max, null);
+      const minItem = data.reduce((min, d) => (d.lip && (!min || d.lip < min.lip)) ? d : min, null);
+
+      document.getElementById('stat-count').textContent = data.length;
+      document.getElementById('stat-avg-lip').textContent = `${avgLip} mm`;
+      if (maxItem) document.getElementById('stat-max-lip').textContent = `${maxItem.make} ${maxItem.model} (${maxItem.lip}mm)`;
+      if (minItem) document.getElementById('stat-min-lip').textContent = `${minItem.make} ${minItem.model} (${minItem.lip}mm)`;
+
+      renderTable();
+      renderVisualizer();
+      renderComparisonDrawer();
+    }
+
+    function setVizMode(mode) {
+      vizMode = mode;
+      document.getElementById('btn-mode-overlay').classList.toggle('active', mode === 'overlay');
+      document.getElementById('btn-mode-side').classList.toggle('active', mode === 'side');
+      renderVisualizer();
+    }
+
+    function buildNozzleSVGPath(item, originX, originY) {
+      const stemLen = item.length || 4.5;
+      const lipDiam = item.lip || 6.0;
+      const boreDiam = item.bore || (lipDiam - 0.6);
+
+      const rShaft = (boreDiam / 2) * SCALE_PX;
+      const rLip = (lipDiam / 2) * SCALE_PX;
+      const hStem = stemLen * SCALE_PX;
+      const rShoulder = rShaft + (1.6 * SCALE_PX);
+
+      const lipHeightMm = (lipDiam > boreDiam) ? 1.1 : 0.0;
+      const hLip = lipHeightMm * SCALE_PX;
+      const chamfer = 0.35 * SCALE_PX;
+
+      const yBase = originY;
+      const yTip = originY - hStem;
+      const yLipBottom = yTip + hLip;
+
+      let d = `M ${originX - rShoulder} ${yBase} `;
+      d += `L ${originX - rShaft} ${yBase} `;
+
+      if (hLip > 0) {
+        d += `L ${originX - rShaft} ${yLipBottom} `;
+        d += `L ${originX - rLip} ${yLipBottom + (0.25 * SCALE_PX)} `;
+        d += `L ${originX - rLip} ${yTip + chamfer} `;
+        d += `L ${originX - (rLip - chamfer)} ${yTip} `;
+      } else {
+        d += `L ${originX - rShaft} ${yTip + chamfer} `;
+        d += `L ${originX - (rShaft - chamfer)} ${yTip} `;
+      }
+
+      d += `L ${originX + ((hLip > 0 ? rLip : rShaft) - chamfer)} ${yTip} `;
+
+      if (hLip > 0) {
+        d += `L ${originX + rLip} ${yTip + chamfer} `;
+        d += `L ${originX + rLip} ${yLipBottom + (0.25 * SCALE_PX)} `;
+        d += `L ${originX + rShaft} ${yLipBottom} `;
+      } else {
+        d += `L ${originX + rShaft} ${yTip + chamfer} `;
+      }
+
+      d += `L ${originX + rShaft} ${yBase} `;
+      d += `L ${originX + rShoulder} ${yBase} `;
+
+      return {
+        outerPath: d,
+        stemLen, lipDiam, boreDiam,
+        rLip, rShaft, hStem,
+        yTip, yBase
+      };
+    }
+
+    function renderVisualizer() {
+      const svg = document.getElementById('cadSvg');
+      const gridLayer = document.getElementById('gridLayer');
+      const geoLayer = document.getElementById('geometryLayer');
+      const dimLayer = document.getElementById('dimensionLayer');
+      const legendEl = document.getElementById('viz-legend');
+
+      gridLayer.innerHTML = '';
+      geoLayer.innerHTML = '';
+      dimLayer.innerHTML = '';
+      legendEl.innerHTML = '';
+
+      const showGrid = document.getElementById('chk-grid').checked;
+      const showDims = document.getElementById('chk-dims').checked;
+      const showAcousticCore = document.getElementById('chk-bore').checked;
+
+      const items = Array.from(comparedIds).map(id => data.find(d => d.id === id)).filter(Boolean);
+
+      if (items.length === 0) {
+        legendEl.innerHTML = `<span style="color:var(--text-muted);font-size:0.85rem;">Pin IEMs from the table below to inspect their 2D CAD cross-sections.</span>`;
+        return;
+      }
+
+      const totalWidth = vizMode === 'side' ? Math.max(840, items.length * 210) : 840;
+      svg.setAttribute('width', totalWidth);
+      svg.setAttribute('viewBox', `0 0 ${totalWidth} 270`);
+
+      if (showGrid) {
+        gridLayer.innerHTML = `<rect width="${totalWidth}" height="270" fill="url(#cadGridMajor)" />`;
+      }
+
+      const positions = [];
+      if (vizMode === 'overlay') {
+        const centerX = totalWidth / 2;
+        items.forEach((item, idx) => positions.push({ item, x: centerX, color: PALETTE[idx % PALETTE.length] }));
+      } else {
+        const slotWidth = totalWidth / items.length;
+        items.forEach((item, idx) => {
+          positions.push({ item, x: (idx + 0.5) * slotWidth, color: PALETTE[idx % PALETTE.length] });
+        });
+      }
+
+      geoLayer.innerHTML += `<line x1="10" y1="${BASE_Y}" x2="${totalWidth - 10}" y2="${BASE_Y}" stroke="#30363d" stroke-width="1.5" stroke-dasharray="4 4" />`;
+      geoLayer.innerHTML += `<text x="14" y="${BASE_Y + 14}" fill="#484f58" font-size="10">SHELL BASELINE (0mm)</text>`;
+
+      positions.forEach((pos, idx) => {
+        const { item, x, color } = pos;
+        const geom = buildNozzleSVGPath(item, x, BASE_Y);
+
+        geoLayer.innerHTML += `<line x1="${x}" y1="18" x2="${x}" y2="${BASE_Y + 10}" stroke="#30363d" stroke-width="1" stroke-dasharray="6 3 2 3" />`;
+
+        const opacity = vizMode === 'overlay' ? '0.35' : '0.45';
+        geoLayer.innerHTML += `
+          <path d="${geom.outerPath}" fill="${color}" fill-opacity="${opacity}" stroke="${color}" stroke-width="2.2" stroke-linejoin="round" />
+        `;
+
+        if (showAcousticCore) {
+          const coreDiamMm = Math.max(2.2, geom.boreDiam - 1.6);
+          const rCore = (coreDiamMm / 2) * SCALE_PX;
+          geoLayer.innerHTML += `
+            <rect x="${x - rCore}" y="${geom.yTip}" width="${rCore * 2}" height="${geom.hStem}" fill="#090d13" stroke="${color}" stroke-width="1" stroke-dasharray="2 2" />
+            <line x1="${x - rCore + 1}" y1="${geom.yTip + 2}" x2="${x + rCore - 1}" y2="${geom.yTip + 2}" stroke="${color}" stroke-width="1.5" />
+          `;
+        }
+
+        if (showDims && (vizMode === 'side' || idx === 0)) {
+          const dY = geom.yTip;
+          const labelColor = vizMode === 'side' ? color : 'var(--accent)';
+          const lipLineY = dY - 14;
+
+          dimLayer.innerHTML += `
+            <line x1="${x - geom.rLip}" y1="${dY - 2}" x2="${x - geom.rLip}" y2="${lipLineY - 4}" stroke="#30363d" stroke-width="1" />
+            <line x1="${x + geom.rLip}" y1="${dY - 2}" x2="${x + geom.rLip}" y2="${lipLineY - 4}" stroke="#30363d" stroke-width="1" />
+            <line x1="${x - geom.rLip}" y1="${lipLineY}" x2="${x + geom.rLip}" y2="${lipLineY}" stroke="${labelColor}" stroke-width="1.2" marker-start="url(#arrow)" marker-end="url(#arrow)" />
+            <text x="${x}" y="${lipLineY - 4}" text-anchor="middle" fill="${labelColor}" font-size="10.5" font-weight="600">
+              Lip: ⌀${geom.lipDiam.toFixed(2)}mm
+            </text>
+          `;
+
+          const boreLineY = BASE_Y - (geom.hStem * 0.45);
+          dimLayer.innerHTML += `
+            <line x1="${x - geom.rShaft}" y1="${boreLineY}" x2="${x + geom.rShaft}" y2="${boreLineY}" stroke="#8b949e" stroke-width="1" marker-start="url(#arrow)" marker-end="url(#arrow)" />
+            <text x="${x}" y="${boreLineY - 3}" text-anchor="middle" fill="#c9d1d9" font-size="9.5">
+              Waist: ⌀${geom.boreDiam.toFixed(2)}mm
+            </text>
+          `;
+
+          const stemLineX = x + Math.max(geom.rLip, geom.rShaft) + 18;
+          dimLayer.innerHTML += `
+            <line x1="${x + geom.rShaft}" y1="${BASE_Y}" x2="${stemLineX + 4}" y2="${BASE_Y}" stroke="#30363d" stroke-width="1" />
+            <line x1="${x + geom.rLip}" y1="${geom.yTip}" x2="${stemLineX + 4}" y2="${geom.yTip}" stroke="#30363d" stroke-width="1" />
+            <line x1="${stemLineX}" y1="${BASE_Y}" x2="${stemLineX}" y2="${geom.yTip}" stroke="#8b949e" stroke-width="1.2" marker-start="url(#arrow)" marker-end="url(#arrow)" />
+            <text x="${stemLineX + 5}" y="${BASE_Y - (geom.hStem / 2) + 3}" fill="#8b949e" font-size="9.5">
+              L: ${item.length ? item.length.toFixed(1) + 'mm' : 'est'}
+            </text>
+          `;
+
+          if (vizMode === 'side') {
+            dimLayer.innerHTML += `
+              <text x="${x}" y="${BASE_Y + 28}" text-anchor="middle" fill="${color}" font-size="12" font-weight="700">
+                ${item.make} ${item.model}
+              </text>
+            `;
+          }
+        }
+
+        legendEl.innerHTML += `
+          <div class="legend-item">
+            <span class="legend-dot" style="background:${color};"></span>
+            <strong>${item.make} ${item.model}</strong>
+            <span style="color:var(--text-muted);">(Lip: ${item.lip ? item.lip.toFixed(2) + 'mm' : '-'} | Stem: ${item.length ? item.length.toFixed(1) + 'mm' : 'N/A'})</span>
+          </div>
+        `;
+      });
+    }
+
+    function renderComparisonDrawer() {
+      const grid = document.getElementById('comparison-grid');
+      grid.innerHTML = '';
+
+      comparedIds.forEach(id => {
+        const item = data.find(d => d.id === id);
+        if (!item) return;
+
+        const fit = getFitClass(item.lip);
+        const card = document.createElement('div');
+        card.className = 'comp-card';
+
+        const lipPct = item.lip ? Math.min(100, (item.lip / 7.5) * 100) : 0;
+        const borePct = item.bore ? Math.min(100, (item.bore / 7.5) * 100) : 0;
+        const lenPct = item.length ? Math.min(100, (item.length / 8.5) * 100) : 0;
+
+        card.innerHTML = `
+          <button class="comp-card-remove" onclick="toggleCompare(${item.id})">×</button>
+          <div class="make-label">${item.make}</div>
+          <h3>${item.model}</h3>
+
+          <div class="metric-row">
+            <div class="metric-label">
+              <span>Lip Diameter</span>
+              <strong>${item.lip ? item.lip.toFixed(2) + ' mm' : 'N/A'}</strong>
+            </div>
+            <div class="metric-bar-bg">
+              <div class="metric-bar-fill" style="width: ${lipPct}%; background: var(--accent);"></div>
+            </div>
+          </div>
+
+          <div class="metric-row">
+            <div class="metric-label">
+              <span>Bore Diameter</span>
+              <strong>${item.bore ? item.bore.toFixed(2) + ' mm' : 'N/A'}</strong>
+            </div>
+            <div class="metric-bar-bg">
+              <div class="metric-bar-fill" style="width: ${borePct}%; background: #3fb950;"></div>
+            </div>
+          </div>
+
+          <div class="metric-row">
+            <div class="metric-label">
+              <span>Stem Insertion Length</span>
+              <strong>${item.length ? item.length.toFixed(2) + ' mm' : 'N/A'}</strong>
+            </div>
+            <div class="metric-bar-bg">
+              <div class="metric-bar-fill" style="width: ${lenPct}%; background: var(--purple);"></div>
+            </div>
+          </div>
+
+          <div><span class="fit-badge ${fit.css}">${fit.label}</span></div>
+          <div class="tip-advice">💡 ${getTipAdvice(item.lip)}</div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function toggleCompare(id) {
+      if (comparedIds.has(id)) {
+        comparedIds.delete(id);
+      } else {
+        if (comparedIds.size >= 4) {
+          alert('Maximum 4 IEMs can be pinned to CAD comparison.');
+          return;
+        }
+        comparedIds.add(id);
+      }
+      renderVisualizer();
+      renderComparisonDrawer();
+      renderTable();
+    }
+
+    function setSort(key) {
+      if (currentSort.key === key) {
+        currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSort.key = key;
+        currentSort.dir = (key === 'make' || key === 'model') ? 'asc' : 'desc';
+      }
+      renderTable();
+    }
+
+    function renderTable() {
+      const search = document.getElementById('searchInput').value.toLowerCase().trim();
+      const selectedBrand = document.getElementById('brandFilter').value;
+      const fitFilter = document.getElementById('fitFilter').value;
+
+      let filtered = data.filter(d => {
+        const matchesSearch = `${d.make || ''} ${d.model || ''}`.toLowerCase().includes(search);
+        const matchesBrand = (selectedBrand === 'all' || d.make === selectedBrand);
+
+        let matchesFit = true;
+        if (fitFilter === 'slim') matchesFit = (d.lip && d.lip < 5.5);
+        else if (fitFilter === 'standard') matchesFit = (d.lip && d.lip >= 5.5 && d.lip <= 6.0);
+        else if (fitFilter === 'wide') matchesFit = (d.lip && d.lip > 6.0 && d.lip <= 6.5);
+        else if (fitFilter === 'xl') matchesFit = (d.lip && d.lip > 6.5);
+
+        return matchesSearch && matchesBrand && matchesFit;
+      });
+
+      filtered.sort((a, b) => {
+        let va = a[currentSort.key];
+        let vb = b[currentSort.key];
+        if (va === null || va === undefined) return 1;
+        if (vb === null || vb === undefined) return -1;
+        if (typeof va === 'string') {
+          return currentSort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+        }
+        return currentSort.dir === 'asc' ? va - vb : vb - va;
+      });
+
+      document.querySelectorAll('th').forEach(th => th.classList.remove('sorted-asc', 'sorted-desc'));
+      const thIndex = ['make', 'model', 'lip', 'bore', 'flare', 'length'].indexOf(currentSort.key);
+      if (thIndex >= 0) {
+        document.querySelectorAll('th')[thIndex].classList.add(currentSort.dir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+      }
+
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      filtered.forEach(item => {
+        const tr = document.createElement('tr');
+        const fit = getFitClass(item.lip);
+        const isCompared = comparedIds.has(item.id);
+
+        tr.innerHTML = `
+          <td><strong>${item.make}</strong></td>
+          <td>${item.model}</td>
+          <td>${item.lip ? item.lip.toFixed(2) + ' mm' : '-'}</td>
+          <td>${item.bore ? item.bore.toFixed(2) + ' mm' : '-'}</td>
+          <td>${item.flare ? item.flare.toFixed(2) + ' mm' : '-'}</td>
+          <td>${item.length ? item.length.toFixed(2) + ' mm' : '-'}</td>
+          <td><span class="fit-badge ${fit.css}">${fit.label}</span></td>
+          <td>
+            <button class="action-btn ${isCompared ? 'active' : ''}" onclick="toggleCompare(${item.id})">
+              ${isCompared ? 'Pinned' : '+ Pin CAD'}
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
